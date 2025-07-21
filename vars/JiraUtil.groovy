@@ -2,21 +2,33 @@ import groovy.json.JsonBuilder
 import hudson.AbortException
 
 /**
- * Build the JSON body for a new Jira issue.
+ * Build the JSON body for a new Jira issue, adding assignee & reporter if provided.
  */
 def createJiraPayload(String summary,
                       String description,
                       String projectKey,
-                      String issueType) {
-  def payload = [
-    fields: [
-      project    : [ key: projectKey ],
-      summary    : summary,
-      description: description,
-      issuetype  : [ name: issueType ]
-    ]
+                      String issueType,
+                      String assignee,
+                      String reporter) {
+
+  def fields = [
+    project    : [ key: projectKey ],
+    summary    : summary,
+    description: description,
+    issuetype  : [ name: issueType ]
   ]
-  new JsonBuilder(payload).toPrettyString()
+
+  // only include assignee if non-blank
+  if (assignee?.trim()) {
+    fields.assignee = [ name: assignee.trim() ]
+  }
+  // only include reporter if non-blank
+  if (reporter?.trim()) {
+    fields.reporter = [ name: reporter.trim() ]
+  }
+
+  def payload = [ fields: fields ]
+  return new JsonBuilder(payload).toPrettyString()
 }
 
 /**
@@ -26,7 +38,6 @@ def call(String method,
          String url,
          String authId = 'jira-api-token-id',
          String body   = null) {
-  // allow all status codes through
   def resp = httpRequest(
     ignoreSslErrors     : true,
     authentication      : authId,
@@ -39,7 +50,6 @@ def call(String method,
   )
 
   if (resp.status.toInteger() >= 400) {
-    // dump the error payload
     echo ">>> Jira returned HTTP ${resp.status}\n${resp.content}"
     error "Aborting: Jira call failed with status ${resp.status}"
   }
@@ -52,13 +62,14 @@ def call(String method,
 def createJiraTicket(String summary,
                      String description,
                      String projectKey,
-                     String issueType) {
+                     String issueType,
+                     String assignee,
+                     String reporter) {
   def jiraUrl = "https://abhishekalimchandani1624.atlassian.net/rest/api/2/issue"
-  def body    = createJiraPayload(summary, description, projectKey, issueType)
+  def body    = createJiraPayload(summary, description, projectKey, issueType, assignee, reporter)
   def resp    = call('POST', jiraUrl, env.JIRA_AUTH, body)
-
   echo "✅ Jira ticket created: ${resp.content}"
 }
 
-// IMPORTANT: make sure load() returns this script instance
+// ensure load() returns this script instance
 return this
