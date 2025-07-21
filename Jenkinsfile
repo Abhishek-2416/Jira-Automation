@@ -26,7 +26,7 @@ pipeline {
       steps {
         script {
           // load your helper script
-          def jiraUtil = load "${env.WORKSPACE}/Jira-Automation/vars/JiraUtil.groovy"
+          def jiraUtil = load "vars/JiraUtil.groovy"
 
           // call the function exported by jiraUtil
           jiraUtil.createJiraTicket(
