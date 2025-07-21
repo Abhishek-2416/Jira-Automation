@@ -11,8 +11,8 @@ pipeline {
     text(name: 'Description',  defaultValue: '', description: 'Jira issue description')
     string(name: 'PROJECT',    defaultValue: '', description: 'Jira project key (e.g. STPE)')
     string(name: 'Issue_Type', defaultValue: 'Task', description: 'Issue type (e.g. Bug, Task)')
-    string(name: 'Assignee',   defaultValue: '', description: 'Username to assign')
-    string(name: 'Reporter',   defaultValue: '', description: 'Username of reporter')
+    // string(name: 'Assignee',   defaultValue: '', description: 'Username to assign')
+    // string(name: 'Reporter',   defaultValue: '', description: 'Username of reporter')
   }
 
   stages {
@@ -33,9 +33,9 @@ pipeline {
             params.Summary,
             params.Description,
             params.PROJECT,
-            params.Issue_Type,
-            params.Assignee,
-            params.Reporter
+            params.Issue_Type
+            // params.Assignee,
+            // params.Reporter
           )
         }
       }
