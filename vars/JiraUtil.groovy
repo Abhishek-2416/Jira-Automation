@@ -3,15 +3,15 @@ import groovy.json.JsonBuilder
 import java.net.URLEncoder
 
 // Step 1: Function to build Jira issue payload
-def createJiraPayload(String summary, String description, String projectKey, String issueType, String assignee, String reporter) {
+def createJiraPayload(String summary, String description, String projectKey, String issueType) {
     def payload = [
         fields: [
             project     : [ key: projectKey ],
             summary     : summary,
             description : description,
-            issuetype   : [ name: issueType ],
-            assignee    : [ name: assignee ],
-            reporter    : [ name: reporter ]
+            issuetype   : [ name: issueType ]
+            //assignee    : [ name: assignee ],
+            //reporter    : [ name: reporter ]
             // Removed: customfield_10008 (Epic Link)
         ]
     ]
@@ -31,8 +31,13 @@ def call(httpRequestType, url, authentication = 'jira-api-token-id', body = null
             url: url
         )
         return response
-    } catch (err) {
-        error "Failed to create JIRA ticket: ${err}"
+    } catch (hudson.AbortException err) {
+         // print the HTTP status and the raw body Jira sent back
+        echo ">>> Jira HTTP error: ${err.getMessage()}"
+        if (err.response?.content) {
+        echo ">>> Jira payload error:\n${err.response.content}"
+        }
+        error "Aborting: Jira returned ${err.response?.status}"
     }
 }
 
@@ -53,9 +58,9 @@ node {
             params.Summary,
             params.Description,
             params.PROJECT,      // This should be the Jira project key (e.g., "STPE")
-            params.Issue_Type,
-            params.Assignee,
-            params.Reporter
+            params.Issue_Type
+            // params.Assignee,
+            // params.Reporter
         )
     }
 }
