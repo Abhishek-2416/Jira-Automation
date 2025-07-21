@@ -51,16 +51,16 @@ def createJiraTicket(String summary, String description, String projectKey, Stri
     echo "JIRA ticket created successfully: ${response.content}"
 }
 
-// Example usage in Jenkins Pipeline
-node {
-    stage('Create Jira Ticket') {
-        createJiraTicket(
-            params.Summary,
-            params.Description,
-            params.PROJECT,      // This should be the Jira project key (e.g., "STPE")
-            params.Issue_Type
-            // params.Assignee,
-            // params.Reporter
-        )
-    }
-}
+// // Example usage in Jenkins Pipeline
+// node {
+//     stage('Create Jira Ticket') {
+//         createJiraTicket(
+//             params.Summary,
+//             params.Description,
+//             params.PROJECT,      // This should be the Jira project key (e.g., "STPE")
+//             params.Issue_Type
+//             // params.Assignee,
+//             // params.Reporter
+//         )
+//     }
+// }
