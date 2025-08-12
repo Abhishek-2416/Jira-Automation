@@ -1,5 +1,6 @@
 import groovy.json.JsonBuilder
 import hudson.AbortException
+import groovy.json.JsonSlurper
 
 /**
  * Build the JSON body for a new Jira issue.
@@ -7,16 +8,25 @@ import hudson.AbortException
 def createJiraPayload(String summary,
                       String description,
                       String projectKey,
-                      String issueType) {
+                      String issueType,
+                      String reporterUsername,
+                      String assigneeUsername,
+                      String componentName,
+                      String epicLinkKey) {
   def payload = [
     fields: [
       project    : [ key: projectKey ],
       summary    : summary,
       description: description,
-      issuetype  : [ name: issueType ]
+      issuetype  : [ name: issueType ],
+      reporter   : [ name: reporterUsername ],
+      assignee   : [ name: assigneeUsername ],
+      components : [[ name: componentName ]],
+      customfield_10006: epicLinkKey  // Epic Link
     ]
   ]
-  new JsonBuilder(payload).toPrettyString()
+
+  return new JsonBuilder(payload).toPrettyString()
 }
 
 /**
@@ -24,9 +34,8 @@ def createJiraPayload(String summary,
  */
 def call(String method,
          String url,
-         String authId = 'jira-api-token-id',
+         String authId = 'jira-creds-abhishek',
          String body   = null) {
-  // allow all status codes through
   def resp = httpRequest(
     ignoreSslErrors     : true,
     authentication      : authId,
@@ -39,7 +48,6 @@ def call(String method,
   )
 
   if (resp.status.toInteger() >= 400) {
-    // dump the error payload
     echo ">>> Jira returned HTTP ${resp.status}\n${resp.content}"
     error "Aborting: Jira call failed with status ${resp.status}"
   }
@@ -52,13 +60,50 @@ def call(String method,
 def createJiraTicket(String summary,
                      String description,
                      String projectKey,
-                     String issueType) {
-  def jiraUrl = "https://abhishekalimchandani1624.atlassian.net/rest/api/2/issue"
-  def body    = createJiraPayload(summary, description, projectKey, issueType)
+                     String issueType,
+                     String reporterUsername,
+                     String assigneeUsername,
+                     String componentName,
+                     String epicLinkKey) {
+  def jiraUrl = "https://jira.davita.com/rest/api/2/issue"
+  def body    = createJiraPayload(summary, description, projectKey, issueType, reporterUsername, assigneeUsername, componentName, epicLinkKey)
   def resp    = call('POST', jiraUrl, env.JIRA_AUTH, body)
 
-  echo "✅ Jira ticket created: ${resp.content}"
+  def json = new JsonSlurper().parseText(resp.content)
+  def issueKey = json.key
+  def issueUrl = "https://jira.davita.com/browse/${issueKey}"
+
+  echo "Jira ticket created: ${issueKey}"
+  echo "View it at: ${issueUrl}"
+
+  // Add Jira link to Jenkins UI
+  try {
+    currentBuild.description = "${issueUrl}"
+  } catch (MissingPropertyException ignored) {
+    echo "Not running inside Jenkins or currentBuild not available."
+  }
+
+  // Log time if TIME_SPENT is passed
+  if (env.TIME_SPENT?.trim()) {
+    def comment = env.WORKLOG_COMMENT ?: "Logged from Jenkins"
+    logWorkTime(issueKey, env.TIME_SPENT.trim(), comment)
+  }
+
+  return issueUrl
 }
 
-// IMPORTANT: make sure load() returns this script instance
+/**
+ * Log time against a Jira issue.
+ */
+def logWorkTime(String issueKey, String timeSpent, String comment = "") {
+  def worklogUrl = "https://jira.com/rest/api/2/issue/${issueKey}/worklog"
+  def worklogBody = new JsonBuilder([
+    comment   : comment,
+    timeSpent : timeSpent
+  ]).toPrettyString()
+
+  def resp = call('POST', worklogUrl, env.JIRA_AUTH, worklogBody)
+  echo "Logged ${timeSpent} to ${issueKey}"
+}
+
 return this

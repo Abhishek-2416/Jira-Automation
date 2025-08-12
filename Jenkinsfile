@@ -1,22 +1,91 @@
 pipeline {
-  agent any
+  agent {
+    kubernetes {
+      inheritFrom 'alpine'
+    }
+  }
 
   environment {
-    // Jenkins credential ID for a user/API-token with rights to create issues
-    JIRA_AUTH = 'jira-api-token-id'
+    JIRA_AUTH = 'jira-creds-abhishek'
   }
 
   parameters {
-    string(name: 'Summary',     defaultValue: '',       description: 'Jira issue summary')
-    text(  name: 'Description', defaultValue: '',       description: 'Jira issue description')
-    // ← set a sane default here so you don’t get a blank key on replay
-    string(name: 'PROJECT',     defaultValue: 'TEST',   description: 'Jira project key (e.g. STPE)')
-    string(name: 'Issue_Type',  defaultValue: 'Task',   description: 'Issue type (e.g. Bug, Task)')
+    string(
+      name: 'Summary',
+      defaultValue: '',
+      description: 'Jira issue summary'
+    )
+    text(
+      name: 'Description',
+      defaultValue: '''Root:
+
+Resolution:
+
+category : 
+
+Master:
+Project:
+Repository:
+
+Kubernetes Node:
+Build Node: N/A
+Developer Name:
+Owner: Abhishek Alimchandani
+Date: 07/29/2025
+Release: N/A
+
+Comments:''',
+      description: 'Jira issue description'
+    )
+    string(
+      name: 'PROJECT',
+      defaultValue: 'STPE',
+      description: 'Jira project key (e.g. STPE)'
+    )
+    string(
+      name: 'Issue_Type',
+      defaultValue: 'Story',
+      description: 'Issue type (e.g. Bug, Task)'
+    )
+    string(
+      name: 'Reporter',
+      defaultValue: 'TAMREID',
+      description: 'Reporter Jira username'
+    )
+    choice(
+      name: 'Assignee',
+      choices: ['aalimchandani','KVISHWAKANTH','SKARRE','VBANDA','RPOLENENI'],
+      description: 'Choose Assignee username'
+    )
+    choice(
+      name: 'Component',
+      choices: ['Jenkins'],
+      description: 'Select Jira Component'
+    )
+    choice(
+      name: 'Epic_Link',
+      choices: [
+        'STPE-3136 : Jenkins Stabilization & Performance Enhancements'
+      ],
+      description: 'Select Epic to associate with this ticket'
+    )
+    string(
+      name: 'TIME_SPENT',
+      defaultValue: '',
+      description: 'Time spent on this issue (e.g. 1h, 30m, 2h 15m)'
+    )
+    string(
+      name: 'WORKLOG_COMMENT',
+      defaultValue: '',
+      description: 'Comment for the time log entry (optional)'
+    )
   }
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     stage('Create Jira Ticket') {
@@ -24,21 +93,29 @@ pipeline {
         script {
           def jiraUtil = load 'vars/JiraUtil.groovy'
 
-          // sanity-check payload builder:
-          def sample = jiraUtil.createJiraPayload(
-            '🔧 TEST Summary',
-            '🔧 TEST Description',
-            params.PROJECT,
-            params.Issue_Type
-          )
-          echo "✔️ Payload OK: ${sample.take(80)}…"
+          def epicKey = params.Epic_Link.split(':')[0].trim()
 
-          // actual ticket creation
+          def sample = jiraUtil.createJiraPayload(
+            'TEST Summary',
+            'TEST Description',
+            params.PROJECT,
+            params.Issue_Type,
+            params.Reporter,
+            params.Assignee,
+            params.Component,
+            epicKey
+          )
+          echo "Payload OK: ${sample.take(80)}..."
+
           jiraUtil.createJiraTicket(
             params.Summary,
             params.Description,
             params.PROJECT,
-            params.Issue_Type
+            params.Issue_Type,
+            params.Reporter,
+            params.Assignee,
+            params.Component,
+            epicKey
           )
         }
       }
@@ -46,7 +123,11 @@ pipeline {
   }
 
   post {
-    success { echo "✅ Pipeline completed successfully." }
-    failure { echo "❌ Pipeline failed; check the JSON error above." }
+    success {
+      echo "Pipeline completed successfully."
+    }
+    failure {
+      echo "Pipeline failed; check the JSON error above."
+    }
   }
 }
