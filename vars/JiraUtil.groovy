@@ -17,7 +17,7 @@ def createJiraPayload(String summary,
     fields: [
       project    : [ key: projectKey ],
       summary    : summary,
-      description: description,
+      description: updateCurrentDateAndOwnerName(description,assigneeUsername),
       issuetype  : [ name: issueType ],
       reporter   : [ name: reporterUsername ],
       assignee   : [ name: assigneeUsername ],
@@ -65,13 +65,13 @@ def createJiraTicket(String summary,
                      String assigneeUsername,
                      String componentName,
                      String epicLinkKey) {
-  def jiraUrl = "https://jira.davita.com/rest/api/2/issue"
+  def jiraUrl = "https://jira.com/rest/api/2/issue"
   def body    = createJiraPayload(summary, description, projectKey, issueType, reporterUsername, assigneeUsername, componentName, epicLinkKey)
   def resp    = call('POST', jiraUrl, env.JIRA_AUTH, body)
 
   def json = new JsonSlurper().parseText(resp.content)
   def issueKey = json.key
-  def issueUrl = "https://jira.davita.com/browse/${issueKey}"
+  def issueUrl = "https://jira.com/browse/${issueKey}"
 
   echo "Jira ticket created: ${issueKey}"
   echo "View it at: ${issueUrl}"
@@ -105,5 +105,43 @@ def logWorkTime(String issueKey, String timeSpent, String comment = "") {
   def resp = call('POST', worklogUrl, env.JIRA_AUTH, worklogBody)
   echo "Logged ${timeSpent} to ${issueKey}"
 }
+
+private String updateCurrentDateAndOwnerName(String description,String assigneeUsername){
+    def today = new Date().format('MM/dd/yyyy')
+
+    def datePattern = ~/^\d{2}\/\d{2}\/(\d{2}|\d{4})$/
+
+    def matcher = (description =~ /(?m)^Date:\s*(.*)$/)
+
+    if(matcher.find()){
+        def existingDate =  matcher.group(1).trim()
+
+        if(existingDate ==~ datePattern){
+            return description
+        }else {
+            return description.replaceFirst(/(?m)^Date:\s*.*/, "Date: ${today}")
+        }
+    }
+
+    def ownerName = getFullName(assigneeUsername)
+
+    description = description.replaceFirst(/(?m)^Owner:\s*.*/, "Owner: ${ownerName}")
+
+    return description
+}
+
+private String getFullName(String assigneeUsername){
+    def searchUrl = "https://jira.com/rest/api/2/user/search?username=${assigneeUsername}"
+    def resp = call('GET', searchUrl, env.JIRA_AUTH)
+    def user = new JsonSlurper().parseText(resp.content)
+
+    if(user && user.displayName){
+        return user.displayName
+    }
+
+    return assigneeUsername
+}
+
+
 
 return this
